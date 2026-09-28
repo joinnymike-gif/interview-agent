@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: interview-agent
+  # 调用大模型是慢 IO（一次几秒到几十秒），用虚拟线程避免 Tomcat 线程池被占满
+  threads:
+    virtual:
+      enabled: true
+  # 错误响应统一用 RFC 9457 ProblemDetail 格式
+  mvc:
+    problemdetails:
+      enabled: true
+  ai:
+    model:
+      # 当前生效的对话模型：anthropic 或 openai（openai 指任何 OpenAI 兼容接口，如 DeepSeek、通义千问）
+      chat: ${AI_PROVIDER:anthropic}
+      # 暂不使用的能力先关掉，避免 OpenAI starter 在没配 key 时启动失败
+      embedding: none
+      image: none
+      audio:
+        speech: none
+        transcription: none
+      moderation: none
+
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}
+      chat:
+        options:
+          model: ${ANTHROPIC_MODEL:claude-opus-5}
+          max-tokens: 16000
+
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      base-url: ${OPENAI_BASE_URL:https://api.deepseek.com}
+      chat:
+        options:
+          model: ${OPENAI_MODEL:deepseek-chat}
+
+interview:
+  # 主问题数量（追问不计），写进系统提示词，由模型把控节奏
+  max-questions: 6
+  # 单场面试最多回答次数，防止对话无限进行、成本失控
+  max-answers: 30
+  # 对话记忆保留的最近消息条数
+  memory-max-messages: 200
+
+logging:
+  level:
+    # 改成 DEBUG 可以看到每次发给模型的完整请求和响应（SimpleLoggerAdvisor）
+    org.springframework.ai.chat.client.advisor: INFO
