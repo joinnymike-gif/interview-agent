@@ -87,6 +87,17 @@ class InterviewFlowTest {
                 .contains("<transcript>", "候选人：" + InterviewService.KICKOFF_MESSAGE, "面试官：面试官回复 1",
                         "候选人：可以用", "</transcript>", "<references>", "考察要点：", "</references>");
 
+        // 导出的面试记录和评估集用例格式一致
+        mockMvc.perform(get("/api/interviews/{id}/transcript", sessionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.position").value("Java 后端开发"))
+                .andExpect(jsonPath("$.yearsOfExperience").value(5))
+                .andExpect(jsonPath("$.transcript[0].role").value("CANDIDATE"))
+                .andExpect(jsonPath("$.transcript[0].text").value(InterviewService.KICKOFF_MESSAGE))
+                .andExpect(jsonPath("$.transcript[1].role").value("INTERVIEWER"))
+                .andExpect(jsonPath("$.transcript[1].text").value("面试官回复 1"))
+                .andExpect(jsonPath("$.transcript.length()").value(4));
+
         mockMvc.perform(get("/api/interviews/{id}", sessionId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("FINISHED"))

@@ -58,6 +58,12 @@ public class InterviewController {
         return interviewService.finish(id);
     }
 
+    /** 导出面试记录，补上人工打分就能加进评估集（见 README 的"评估集"一节） */
+    @GetMapping("/{id}/transcript")
+    public InterviewTranscript transcript(@PathVariable String id) {
+        return interviewService.transcript(id);
+    }
+
     /** 查询面试状态（结束后包含评估报告） */
     @GetMapping("/{id}")
     public InterviewSession get(@PathVariable String id) {
