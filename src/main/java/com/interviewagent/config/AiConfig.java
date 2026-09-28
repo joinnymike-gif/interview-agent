@@ -7,6 +7,7 @@ import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import org.springframework.ai.embedding.BatchingStrategy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,8 +16,8 @@ import org.springframework.core.io.Resource;
 /**
  * 大模型相关的 Bean。
  * <p>
- * 这里只依赖 Spring AI 的通用抽象（ChatClient / ChatMemory），不依赖具体厂商，
- * 所以切换 Anthropic、DeepSeek、通义千问等模型只需要改配置，不用改代码。
+ * 这里只依赖 Spring AI 的通用抽象（ChatClient / ChatMemory / BatchingStrategy），不依赖具体厂商，
+ * 所以切换 DeepSeek、通义千问、Claude 等模型只需要改配置，不用改代码。
  */
 @Configuration
 public class AiConfig {
@@ -32,6 +33,14 @@ public class AiConfig {
                 .chatMemoryRepository(chatMemoryRepository)
                 .maxMessages(properties.memoryMaxMessages())
                 .build();
+    }
+
+    /**
+     * 向量库写入时使用的分批策略，替换 Spring AI 的默认策略。
+     */
+    @Bean
+    BatchingStrategy embeddingBatchingStrategy(InterviewProperties properties) {
+        return new MaxSizeBatchingStrategy(properties.rag().embeddingBatchSize());
     }
 
     /**

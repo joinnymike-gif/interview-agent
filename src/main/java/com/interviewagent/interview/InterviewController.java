@@ -1,13 +1,17 @@
 package com.interviewagent.interview;
 
+import com.interviewagent.resume.ResumeParser;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
 
 @RestController
@@ -15,15 +19,25 @@ import reactor.core.publisher.Flux;
 public class InterviewController {
 
     private final InterviewService interviewService;
+    private final ResumeParser resumeParser;
 
-    public InterviewController(InterviewService interviewService) {
+    public InterviewController(InterviewService interviewService, ResumeParser resumeParser) {
         this.interviewService = interviewService;
+        this.resumeParser = resumeParser;
     }
 
     /** 开始面试，返回会话 ID 和面试官的开场白（含第一个问题） */
-    @PostMapping
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public InterviewReply start(@Valid @RequestBody StartInterviewRequest request) {
         return interviewService.start(request);
+    }
+
+    /** 上传简历 PDF 开始面试：表单字段 position、yearsOfExperience，文件字段 resumeFile */
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public InterviewReply startWithResume(@Valid @ModelAttribute StartInterviewRequest request,
+                                          @RequestPart MultipartFile resumeFile) {
+        String resume = resumeParser.parse(resumeFile);
+        return interviewService.start(new StartInterviewRequest(request.position(), request.yearsOfExperience(), resume));
     }
 
     /** 提交回答，返回面试官的下一句（追问或新问题） */

@@ -3,12 +3,15 @@ package com.interviewagent.interview;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.interviewagent.IntegrationTest;
 import com.interviewagent.StubChatModel;
+import com.interviewagent.TestPdfs;
 import com.jayway.jsonpath.JsonPath;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
@@ -17,18 +20,18 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 /**
  * 用假模型跑通完整的面试流程，不需要 API Key，也不产生费用。
  */
-@SpringBootTest(properties = "spring.ai.model.chat=none")
+@IntegrationTest(properties = "spring.ai.model.chat=none")
 @AutoConfigureMockMvc
 class InterviewFlowTest {
 
@@ -56,7 +59,7 @@ class InterviewFlowTest {
         var options = (ToolCallingChatOptions) chatModel.lastPrompt().getOptions();
         assertThat(options.getToolCallbacks())
                 .extracting(cb -> cb.getToolDefinition().name())
-                .containsExactlyInAnyOrder("listTopics", "searchQuestions");
+                .containsExactly("searchQuestions");
 
         // 回答里带花括号的代码片段，不能被当成模板变量
         mockMvc.perform(post("/api/interviews/{id}/answers", sessionId)
@@ -116,6 +119,45 @@ class InterviewFlowTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         assertThat(events).contains("data:流式", "data:回复");
+    }
+
+    @Test
+    void startWithResumePdf() throws Exception {
+        var resumeFile = new MockMultipartFile("resumeFile", "resume.pdf", "application/pdf",
+                TestPdfs.withLines("Built an order system with Kafka and Redis"));
+
+        mockMvc.perform(multipart("/api/interviews")
+                        .file(resumeFile)
+                        .param("position", "Java 后端开发")
+                        .param("yearsOfExperience", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionId").isNotEmpty());
+
+        // 从 PDF 提取出的文字应填进系统提示词的 <resume> 标签里
+        assertThat(chatModel.lastPrompt().getSystemMessage().getText())
+                .contains("<resume>\nBuilt an order system with Kafka and Redis\n</resume>", "3 年工作经验");
+    }
+
+    @Test
+    void rejectsResumeThatIsNotPdf() throws Exception {
+        var resumeFile = new MockMultipartFile("resumeFile", "resume.docx", "application/octet-stream",
+                "not a pdf".getBytes(StandardCharsets.UTF_8));
+
+        mockMvc.perform(multipart("/api/interviews")
+                        .file(resumeFile)
+                        .param("position", "Java 后端开发")
+                        .param("yearsOfExperience", "3"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("无法解析简历文件，请上传 PDF 格式"));
+    }
+
+    @Test
+    void validatesFormFieldsWhenUploadingResume() throws Exception {
+        var resumeFile = new MockMultipartFile("resumeFile", "resume.pdf", "application/pdf",
+                TestPdfs.withLines("Java developer"));
+
+        mockMvc.perform(multipart("/api/interviews").file(resumeFile).param("position", "Java 后端开发"))
+                .andExpect(status().isBadRequest());
     }
 
     @ParameterizedTest

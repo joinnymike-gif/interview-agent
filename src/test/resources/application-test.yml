@@ -1,0 +1,10 @@
+spring:
+  ai:
+    model:
+      # 测试里的 EmbeddingModel 和 VectorStore 由 TestAiConfig 提供
+      embedding: none
+    vectorstore:
+      type: none
+  autoconfigure:
+    # 不连数据库
+    exclude: org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration

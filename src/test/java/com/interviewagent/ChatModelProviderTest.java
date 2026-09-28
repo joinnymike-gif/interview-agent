@@ -8,7 +8,6 @@ import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 
 /**
  * 验证 spring.ai.model.chat 能切换模型厂商，且只配一家的 Key 就能正常启动。
@@ -17,7 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 class ChatModelProviderTest {
 
     @Nested
-    @SpringBootTest(properties = {"spring.ai.model.chat=anthropic", "spring.ai.anthropic.api-key=test-key"})
+    @IntegrationTest(properties = {"spring.ai.model.chat=anthropic", "spring.ai.anthropic.api-key=test-key"})
     class Anthropic {
 
         @Autowired
@@ -31,7 +30,7 @@ class ChatModelProviderTest {
     }
 
     @Nested
-    @SpringBootTest(properties = "spring.ai.openai.chat.api-key=test-key")
+    @IntegrationTest(properties = "spring.ai.openai.chat.api-key=test-key")
     class DeepSeekByDefault {
 
         @Autowired

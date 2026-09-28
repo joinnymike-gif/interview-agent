@@ -1,0 +1,19 @@
+# 本地开发用的 PostgreSQL + pgvector。
+# 执行 ./mvnw spring-boot:run 时，Spring Boot 会自动启动这里的容器并配置好数据源，不用手动 docker compose up。
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: interview_agent
+      POSTGRES_USER: interview
+      POSTGRES_PASSWORD: interview
+    ports:
+      - "5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    labels:
+      # 告诉 Spring Boot 按 PostgreSQL 处理这个容器（镜像名不是官方的 postgres）
+      org.springframework.boot.service-connection: postgres
+
+volumes:
+  pgdata:

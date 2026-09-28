@@ -9,13 +9,19 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  # 简历 PDF 上传大小限制
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
   ai:
     model:
       # 当前生效的对话模型：openai 或 anthropic
       # openai 指任何 OpenAI 兼容接口，默认连 DeepSeek，也可以连通义千问等
       chat: ${AI_PROVIDER:openai}
+      # 向量化模型，同样走 OpenAI 兼容接口。DeepSeek 没有 embedding 接口，默认用通义千问
+      embedding: openai
       # 暂不使用的能力先关掉，避免 OpenAI starter 在没配 key 时启动失败
-      embedding: none
       image: none
       audio:
         speech: none
@@ -30,6 +36,13 @@ spring:
           model: ${CHAT_MODEL:deepseek-chat}
           # deepseek-chat 单次最多输出 8K token，评估报告比较长，默认的 4K 可能不够
           max-tokens: 8000
+      embedding:
+        api-key: ${EMBEDDING_API_KEY:}
+        base-url: ${EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+        options:
+          model: ${EMBEDDING_MODEL:text-embedding-v4}
+          # 底层 SDK 默认要求返回 base64 格式，部分兼容接口只支持 float，这里显式指定
+          encoding-format: float
 
     anthropic:
       api-key: ${ANTHROPIC_API_KEY:}
@@ -38,6 +51,17 @@ spring:
           model: ${ANTHROPIC_MODEL:claude-opus-5}
           max-tokens: 16000
 
+    vectorstore:
+      pgvector:
+        # 启动时自动创建 vector 扩展和向量表
+        initialize-schema: true
+        # 用题目 ID（如 jvm-001）做主键，默认要求 UUID
+        id-type: TEXT
+        # 必须和 embedding 模型输出的维度一致；换模型后维度变了，要先删掉旧表 vector_store
+        dimensions: ${EMBEDDING_DIMENSIONS:1024}
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+
 interview:
   # 主问题数量（追问不计），写进系统提示词，由模型把控节奏
   max-questions: 6
@@ -45,6 +69,11 @@ interview:
   max-answers: 30
   # 对话记忆保留的最近消息条数
   memory-max-messages: 200
+  rag:
+    # 每次检索返回的题目数量
+    top-k: 5
+    # 每次调用 embedding 接口最多提交的文本条数，通义千问 text-embedding-v4 限制为 10
+    embedding-batch-size: 10
 
 logging:
   level:

@@ -12,5 +12,7 @@ import jakarta.validation.constraints.Size;
 public record StartInterviewRequest(
         @NotBlank @Size(max = 100) String position,
         @NotNull @Min(0) @Max(50) Integer yearsOfExperience,
-        @Size(max = 20_000) String resume) {
+        @Size(max = StartInterviewRequest.MAX_RESUME_LENGTH) String resume) {
+
+    public static final int MAX_RESUME_LENGTH = 20_000;
 }
