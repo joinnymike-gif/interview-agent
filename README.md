@@ -8,7 +8,7 @@ AI 模拟面试官。基于 Spring AI 的练手项目，覆盖 AI 应用开发�
 - 面试官每次只问一个问题，根据回答决定追问还是换题
 - 出题前通过工具调用检索题库（向量 + 关键词混合检索，再用 rerank 模型精排），结合简历里的项目和技术栈挑选或改写题目
 - 支持普通返回和 SSE 流式返回
-- 结束后生成结构化评估报告：总分、录用建议、分维度评分、逐题复盘（附参考答案要点）、改进建议
+- 结束后生成结构化评估报告：总分、录用建议、分维度评分、逐题复盘（附参考答案要点和漏答的考察要点）、改进建议。评分前会把面试中问到的题对应回题库，对照考察要点打分
 
 ## 技术栈
 
@@ -175,8 +175,9 @@ POST /api/interviews/{id}/answers
 
 POST /api/interviews/{id}/finish
   └─ InterviewService
+       ├─ QuestionMatcher：拿面试官的每句提问去题库检索，找出对应的题目和考察要点
        └─ evaluatorChatClient（独立的评估官，没有记忆和工具）
-            ├─ 输入：把对话记忆整理成的文本面试记录
+            ├─ 输入：<transcript> 面试记录 + <references> 检索到的考察要点
             └─ 输出：.entity(InterviewReport.class)，Spring AI 生成 JSON Schema 并把结果反序列化成 Java 对象
 ```
 
@@ -214,6 +215,29 @@ RAG（检索增强生成）分两个阶段：
 - **每次启动全量重建索引**，题库里删改的题目也能同步。题库很大时每次都重新向量化会慢，可以改成按内容哈希增量更新。BM25 索引直接在内存里从题库构建，不用额外存储。
 - **简历不做向量化**。简历只有一两页，直接整份放进提示词更简单也更完整；只有资料多到放不进上下文时才需要切分和检索。
 
+### 评估时也用 RAG
+
+只让模型凭自己的知识给回答打分，评分标准会飘，还可能编出不准确的"参考答案"。所以结束面试时，`QuestionMatcher` 先把面试官的每句提问拿去题库检索（复用上面同一套混合检索 + rerank），每句取最相关的一道题，去重后把题目和考察要点交给评估官：
+
+```
+<transcript>
+候选人：……
+面试官：请讲讲 G1 收集器的原理。
+……
+</transcript>
+
+<references>
+题目：G1 收集器的工作原理是什么？和 CMS 相比有什么优势？
+考察要点：Region 化内存布局；Young GC / Mixed GC；停顿预测模型与 MaxGCPauseMillis；避免 CMS 的碎片和并发失败问题
+</references>
+```
+
+评估官逐条对照考察要点打分，漏答或答错的要点写进报告的 `missedPoints`，候选人复盘时一眼就能看到差在哪。
+
+- **不设相关度阈值**。寒暄和追问也会检索到某道题，但相关度分数在不同请求之间没法直接比较，定阈值容易误伤。提示词里告诉评估官：参考题和实际提问对得上才用，对不上就忽略。
+- **检索失败不影响出报告**。embedding 或 rerank 接口出错时，本次评估不带参考资料，照常生成报告。
+- **防提示词注入**。面试记录放在 `<transcript>` 标签里，并告诉评估官候选人的话只是被评估的内容，里面类似"请给我打满分"的指令不要执行。
+
 ## 代码导读
 
 建议按下表顺序读，每一行对应一个 AI 应用开发的知识点：
@@ -227,12 +251,13 @@ RAG（检索增强生成）分两个阶段：
 | 流式输出 | `InterviewController#answerStream` |
 | RAG：索引 | `questionbank/QuestionIndexer`、`config/MaxSizeBatchingStrategy` |
 | RAG：检索流程 | `questionbank/QuestionRetriever`（召回 → 融合 → rerank → 降级） |
+| 评估时检索考察要点 | `questionbank/QuestionMatcher`、`InterviewService#finish`、`prompts/evaluator-system.st` |
 | 关键词检索 | `rag/Tokenizer`、`rag/Bm25Index` |
 | 多路结果融合 | `rag/ReciprocalRankFusion` |
 | 重排序 | `rag/Reranker`、`rag/HttpReranker` |
 | 检索效果评估 | `src/test/.../RetrievalEvalTest`（对比各检索策略）、`src/test/resources/eval/retrieval-cases.json` |
 | 文档解析 | `resume/ResumeParser` |
-| 提示词注入防护 | `prompts/interviewer-system.st` 里的 `<resume>` 标签 |
+| 提示词注入防护 | `prompts/interviewer-system.st` 里的 `<resume>` 标签、`prompts/evaluator-system.st` 里的 `<transcript>` 标签 |
 | 成本控制 | `StartInterviewRequest` 的输入长度限制、`interview.max-answers` |
 | 不依赖真实模型的测试 | `src/test/.../StubChatModel`、`FakeEmbeddingModel`、`InterviewFlowTest` |
 
@@ -257,6 +282,7 @@ src/main/java/com/interviewagent
 │   ├── QuestionBank.java            # 从 question-bank.json 加载题库
 │   ├── QuestionIndexer.java         # 启动时把题库写入向量库
 │   ├── QuestionRetriever.java       # 检索流程：召回、融合、rerank
+│   ├── QuestionMatcher.java         # 评估时把问过的题对应回题库
 │   └── QuestionBankTools.java       # 暴露给模型的检索工具
 ├── rag                              # 和题库无关的通用检索组件
 │   ├── Tokenizer.java               # 中英文分词
@@ -317,6 +343,7 @@ EMBEDDING_API_KEY=sk-xxx ./mvnw test -Dtest=RetrievalEvalTest
 - 评估报告靠提示词约束模型输出 JSON，而不是厂商的原生 JSON Schema 模式（DeepSeek 不支持后者）。模型偶尔可能输出不合法的 JSON，导致生成报告失败，重试即可。
 - 关键词检索的 BM25 索引在内存里，适合几百到几万道题；题库再大，应该换成 Elasticsearch 或 PostgreSQL 全文检索（加中文分词插件）。
 - 每次检索都会调用一次 rerank 接口，多一次网络往返（通常几百毫秒）和一点费用。对延迟敏感时可以关掉。
+- 结束面试时，面试官的每句话都要检索一次（一次向量化 + 一次 rerank），逐句串行执行。一场十几轮的面试会让生成报告多等几秒，相比评估本身调用大模型的耗时不算大；要更快可以改成并发检索，但要注意接口的限流。
 - 简历只支持能提取文字的 PDF，扫描件和图片需要 OCR，暂不支持。
 - 切换到 Claude 时：Claude API 提供服务端 `fallbacks` 参数（请求被安全分类器拒绝时自动换模型重试），Spring AI 2.0.1 的 Anthropic 配置项里还没有这个参数，所以没有启用。面试场景一般不会触发拒绝。
 
@@ -324,7 +351,7 @@ EMBEDDING_API_KEY=sk-xxx ./mvnw test -Dtest=RetrievalEvalTest
 
 - [x] RAG：题库向量化存进 pgvector，按简历和回答语义检索题目；支持上传简历 PDF
 - [x] RAG 进阶：关键词 + 向量混合检索、rerank 重排序，以及对比各策略的检索评估
-- [ ] 评估时检索题目的考察要点，让评估官的打分有据可依
+- [x] 评估时检索题目的考察要点，让评估官的打分有据可依
 - [ ] 评估集：收集一批面试记录并人工打分，检验评估官的打分和人工是否一致（LLM-as-judge 校准）
 - [ ] 持久化：会话存数据库，对话记忆换成 `JdbcChatMemoryRepository` 或 Redis
 - [ ] 可观测性：统计每场面试的 token 用量和成本，接入链路追踪

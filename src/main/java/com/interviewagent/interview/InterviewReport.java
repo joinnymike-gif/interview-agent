@@ -40,6 +40,8 @@ public record InterviewReport(
             int score,
             @JsonPropertyDescription("对候选人回答的点评")
             String feedback,
+            @JsonPropertyDescription("没答到或答错的考察要点；都答到了就返回空数组")
+            List<String> missedPoints,
             @JsonPropertyDescription("参考答案要点")
             String referenceAnswer) {
     }

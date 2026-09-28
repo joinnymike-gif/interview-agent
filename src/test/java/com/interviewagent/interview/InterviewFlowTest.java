@@ -79,11 +79,13 @@ class InterviewFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.overallScore").value(72))
                 .andExpect(jsonPath("$.recommendation").value("HIRE"))
-                .andExpect(jsonPath("$.questionReviews[0].referenceAnswer").value("数组 + 链表 + 红黑树"));
+                .andExpect(jsonPath("$.questionReviews[0].referenceAnswer").value("数组 + 链表 + 红黑树"))
+                .andExpect(jsonPath("$.questionReviews[0].missedPoints[0]").value("扩容时高低位拆分"));
 
-        // 评估官收到的是整理成文本的面试记录
+        // 评估官收到的是整理成文本的面试记录，以及从题库检索到的考察要点
         assertThat(chatModel.lastPrompt().getUserMessage().getText())
-                .contains("候选人：" + InterviewService.KICKOFF_MESSAGE, "面试官：面试官回复 1", "候选人：可以用");
+                .contains("<transcript>", "候选人：" + InterviewService.KICKOFF_MESSAGE, "面试官：面试官回复 1",
+                        "候选人：可以用", "</transcript>", "<references>", "考察要点：", "</references>");
 
         mockMvc.perform(get("/api/interviews/{id}", sessionId))
                 .andExpect(status().isOk())

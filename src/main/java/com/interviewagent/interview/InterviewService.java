@@ -2,6 +2,8 @@ package com.interviewagent.interview;
 
 import com.interviewagent.config.InterviewProperties;
 import com.interviewagent.interview.InterviewSession.Status;
+import com.interviewagent.questionbank.Question;
+import com.interviewagent.questionbank.QuestionMatcher;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.ai.chat.client.ChatClient;
@@ -25,17 +27,20 @@ public class InterviewService {
     private final ChatClient evaluator;
     private final ChatMemory chatMemory;
     private final InterviewSessionStore sessionStore;
+    private final QuestionMatcher questionMatcher;
     private final InterviewProperties properties;
 
     public InterviewService(@Qualifier("interviewerChatClient") ChatClient interviewer,
                             @Qualifier("evaluatorChatClient") ChatClient evaluator,
                             ChatMemory chatMemory,
                             InterviewSessionStore sessionStore,
+                            QuestionMatcher questionMatcher,
                             InterviewProperties properties) {
         this.interviewer = interviewer;
         this.evaluator = evaluator;
         this.chatMemory = chatMemory;
         this.sessionStore = sessionStore;
+        this.questionMatcher = questionMatcher;
         this.properties = properties;
     }
 
@@ -69,11 +74,15 @@ public class InterviewService {
             return session.report();
         }
 
+        List<Message> history = chatMemory.get(sessionId);
+        // RAG：把面试官问过的问题对应回题库，取出考察要点作为评分依据
+        List<Question> references = questionMatcher.match(interviewerMessages(history));
+
         InterviewReport report = evaluator.prompt()
                 .system(s -> s
                         .param("position", session.position())
                         .param("years", session.yearsOfExperience()))
-                .user(transcript(chatMemory.get(sessionId)))
+                .user(evaluationInput(history, references))
                 .call()
                 .entity(InterviewReport.class);
 
@@ -108,6 +117,33 @@ public class InterviewService {
             }
             return session.withAnswer();
         });
+    }
+
+    /**
+     * 评估官的输入：面试记录和参考资料分别放在标签里，方便提示词引用，也把数据和指令分开。
+     */
+    static String evaluationInput(List<Message> history, List<Question> references) {
+        String referenceText = references.isEmpty()
+                ? "（没有检索到相关的题库题目）"
+                : references.stream()
+                        .map(q -> "题目：%s\n考察要点：%s".formatted(q.question(), String.join("；", q.keyPoints())))
+                        .collect(Collectors.joining("\n\n"));
+        return """
+                <transcript>
+                %s
+                </transcript>
+
+                <references>
+                %s
+                </references>""".formatted(transcript(history), referenceText);
+    }
+
+    static List<String> interviewerMessages(List<Message> history) {
+        return history.stream()
+                .filter(m -> m.getMessageType() == MessageType.ASSISTANT)
+                .map(Message::getText)
+                .filter(StringUtils::hasText)
+                .toList();
     }
 
     /**

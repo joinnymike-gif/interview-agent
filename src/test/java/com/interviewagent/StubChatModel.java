@@ -23,7 +23,8 @@ public class StubChatModel implements ChatModel {
               "recommendation": "HIRE",
               "summary": "基础扎实，系统设计经验偏少。",
               "dimensions": [{"dimension": "基础知识", "score": 4, "comment": "HashMap 讲得清楚"}],
-              "questionReviews": [{"question": "HashMap 原理", "score": 4, "feedback": "要点完整", "referenceAnswer": "数组 + 链表 + 红黑树"}],
+              "questionReviews": [{"question": "HashMap 原理", "score": 4, "feedback": "要点基本完整",
+                                   "missedPoints": ["扩容时高低位拆分"], "referenceAnswer": "数组 + 链表 + 红黑树"}],
               "suggestions": ["补充 G1 的 Region 和 Mixed GC 流程"]
             }
             """;
