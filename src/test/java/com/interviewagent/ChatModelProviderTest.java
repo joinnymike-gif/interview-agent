@@ -31,14 +31,14 @@ class ChatModelProviderTest {
     }
 
     @Nested
-    @SpringBootTest(properties = {"spring.ai.model.chat=openai", "spring.ai.openai.api-key=test-key"})
-    class OpenAiCompatible {
+    @SpringBootTest(properties = "spring.ai.openai.chat.api-key=test-key")
+    class DeepSeekByDefault {
 
         @Autowired
         ChatModel chatModel;
 
         @Test
-        void usesOpenAiCompatibleChatModel() {
+        void usesDeepSeekThroughOpenAiCompatibleApi() {
             assertThat(chatModel).isInstanceOf(OpenAiChatModel.class);
             assertThat(chatModel.getOptions().getModel()).isEqualTo("deepseek-chat");
         }

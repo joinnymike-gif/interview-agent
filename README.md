@@ -13,38 +13,37 @@ AI 模拟面试官。基于 Spring AI 的练手项目，覆盖 AI 应用开发�
 ## 技术栈
 
 - Java 21、Spring Boot 4.1、Spring AI 2.0
-- 模型：默认 Anthropic Claude（`claude-opus-5`），可切换到任何 OpenAI 兼容接口（DeepSeek、通义千问等），不用改代码
+- 模型：默认 DeepSeek（`deepseek-chat`），也可以换成其他 OpenAI 兼容接口（如通义千问）或 Anthropic Claude，只改配置不改代码
 
 ## 快速开始
 
 需要 JDK 21。不用装 Maven，项目自带 `./mvnw`。
 
-**使用 Claude：**
+**使用 DeepSeek（默认）：**
 
 ```bash
+export CHAT_API_KEY=sk-xxx          # DeepSeek 开放平台的 API Key
+./mvnw spring-boot:run
+```
+
+**换成通义千问：**
+
+```bash
+export CHAT_API_KEY=sk-xxx          # 阿里云百炼的 API Key
+export CHAT_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+export CHAT_MODEL=qwen-plus
+./mvnw spring-boot:run
+```
+
+**换成 Claude：**
+
+```bash
+export AI_PROVIDER=anthropic
 export ANTHROPIC_API_KEY=sk-ant-xxx
 ./mvnw spring-boot:run
 ```
 
-**使用 DeepSeek：**
-
-```bash
-export AI_PROVIDER=openai
-export OPENAI_API_KEY=sk-xxx
-./mvnw spring-boot:run
-```
-
-**使用通义千问：**
-
-```bash
-export AI_PROVIDER=openai
-export OPENAI_API_KEY=sk-xxx
-export OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-export OPENAI_MODEL=qwen-plus
-./mvnw spring-boot:run
-```
-
-OpenAI 兼容模式下，实际请求地址是 `OPENAI_BASE_URL` + `/chat/completions`。
+DeepSeek、通义千问走的都是 OpenAI 兼容协议，实际请求地址是 `CHAT_BASE_URL` + `/chat/completions`。
 
 ### 试一下
 
@@ -87,12 +86,12 @@ curl -s localhost:8080/api/interviews/{sessionId}
 
 | 环境变量 | 默认值 | 说明 |
 |---|---|---|
-| `AI_PROVIDER` | `anthropic` | `anthropic` 或 `openai`（OpenAI 兼容接口） |
-| `ANTHROPIC_API_KEY` | | Anthropic API Key |
-| `ANTHROPIC_MODEL` | `claude-opus-5` | Claude 模型 |
-| `OPENAI_API_KEY` | | OpenAI 兼容接口的 Key |
-| `OPENAI_BASE_URL` | `https://api.deepseek.com` | OpenAI 兼容接口地址 |
-| `OPENAI_MODEL` | `deepseek-chat` | 模型名，以各厂商文档为准 |
+| `AI_PROVIDER` | `openai` | `openai`（OpenAI 兼容接口，如 DeepSeek、通义千问）或 `anthropic` |
+| `CHAT_API_KEY` | | 对话模型的 API Key |
+| `CHAT_BASE_URL` | `https://api.deepseek.com` | 对话模型的接口地址 |
+| `CHAT_MODEL` | `deepseek-chat` | 对话模型名，以各厂商文档为准 |
+| `ANTHROPIC_API_KEY` | | `AI_PROVIDER=anthropic` 时使用 |
+| `ANTHROPIC_MODEL` | `claude-opus-5` | `AI_PROVIDER=anthropic` 时使用 |
 
 面试相关参数在 `application.yml` 的 `interview.*` 下：主问题数量、单场最多回答次数、记忆保留条数。
 
@@ -107,7 +106,7 @@ POST /api/interviews/{id}/answers
             ├─ 系统提示词：prompts/interviewer-system.st，按会话填入岗位、年限、简历
             ├─ MessageChatMemoryAdvisor：按 sessionId 取出历史对话拼进请求，回复后再存回去
             ├─ QuestionBankTools：模型需要时调用 searchQuestions，Spring AI 执行方法并把结果回传给模型
-            └─ ChatModel：Anthropic 或 OpenAI 兼容接口，由 AI_PROVIDER 决定
+            └─ ChatModel：默认 DeepSeek，由 AI_PROVIDER 等配置决定
 
 POST /api/interviews/{id}/finish
   └─ InterviewService
@@ -169,9 +168,8 @@ src/main/resources
 
 - 会话和对话记忆都存在内存里，重启就丢失。
 - 没有鉴权。不要直接暴露到公网，否则任何人都能调用接口，花的是你的 API 额度。
-- 默认模型 `claude-opus-5` 效果好，但单价也高。可以用 `ANTHROPIC_MODEL` 换成其他模型，自己权衡。
-- Claude API 提供服务端 `fallbacks` 参数：请求被安全分类器拒绝时，服务端自动换模型重试。Spring AI 2.0.1 的 Anthropic 配置项里还没有这个参数，所以本项目没有启用。面试场景一般不会触发拒绝。
-- 如果你所在地区无法直接访问 Anthropic API，切换到 DeepSeek 或通义千问即可。
+- 评估报告靠提示词约束模型输出 JSON，而不是厂商的原生 JSON Schema 模式（DeepSeek 不支持后者）。模型偶尔可能输出不合法的 JSON，导致生成报告失败，重试即可。
+- 切换到 Claude 时：Claude API 提供服务端 `fallbacks` 参数（请求被安全分类器拒绝时自动换模型重试），Spring AI 2.0.1 的 Anthropic 配置项里还没有这个参数，所以没有启用。面试场景一般不会触发拒绝。
 
 ## 下一步
 

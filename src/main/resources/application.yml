@@ -11,8 +11,9 @@ spring:
       enabled: true
   ai:
     model:
-      # 当前生效的对话模型：anthropic 或 openai（openai 指任何 OpenAI 兼容接口，如 DeepSeek、通义千问）
-      chat: ${AI_PROVIDER:anthropic}
+      # 当前生效的对话模型：openai 或 anthropic
+      # openai 指任何 OpenAI 兼容接口，默认连 DeepSeek，也可以连通义千问等
+      chat: ${AI_PROVIDER:openai}
       # 暂不使用的能力先关掉，避免 OpenAI starter 在没配 key 时启动失败
       embedding: none
       image: none
@@ -21,19 +22,21 @@ spring:
         transcription: none
       moderation: none
 
+    openai:
+      chat:
+        api-key: ${CHAT_API_KEY:}
+        base-url: ${CHAT_BASE_URL:https://api.deepseek.com}
+        options:
+          model: ${CHAT_MODEL:deepseek-chat}
+          # deepseek-chat 单次最多输出 8K token，评估报告比较长，默认的 4K 可能不够
+          max-tokens: 8000
+
     anthropic:
       api-key: ${ANTHROPIC_API_KEY:}
       chat:
         options:
           model: ${ANTHROPIC_MODEL:claude-opus-5}
           max-tokens: 16000
-
-    openai:
-      api-key: ${OPENAI_API_KEY:}
-      base-url: ${OPENAI_BASE_URL:https://api.deepseek.com}
-      chat:
-        options:
-          model: ${OPENAI_MODEL:deepseek-chat}
 
 interview:
   # 主问题数量（追问不计），写进系统提示词，由模型把控节奏
