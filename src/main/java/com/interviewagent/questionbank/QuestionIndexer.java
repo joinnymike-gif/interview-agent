@@ -47,22 +47,27 @@ public class QuestionIndexer implements ApplicationRunner {
     }
 
     /**
-     * 一道题对应一个 Document。参与向量化的文本包含分类、题目和考察要点：
-     * 候选人简历里常出现的是具体技术点（如 "Region"、"分布式锁"），把要点也放进去更容易检索到。
-     * 分类和难度同时放进 metadata，用于检索时按条件过滤。
+     * 一道题对应一个 Document。分类和难度同时放进 metadata，用于检索时按条件过滤。
      */
     static Document toDocument(Question question) {
-        String text = """
-                分类：%s
-                题目：%s
-                考察要点：%s""".formatted(question.topic(), question.question(), String.join("；", question.keyPoints()));
         return Document.builder()
                 .id(question.id())
-                .text(text)
+                .text(indexText(question))
                 .metadata(Map.of(
                         "source", SOURCE,
                         "topic", question.topic(),
                         "difficulty", question.difficulty().name()))
                 .build();
+    }
+
+    /**
+     * 参与检索的文本，向量检索、关键词检索和 rerank 都用它。包含分类、题目和考察要点：
+     * 候选人简历里常出现的是具体技术点（如 "Region"、"分布式锁"），把要点也放进去更容易检索到。
+     */
+    static String indexText(Question question) {
+        return """
+                分类：%s
+                题目：%s
+                考察要点：%s""".formatted(question.topic(), question.question(), String.join("；", question.keyPoints()));
     }
 }

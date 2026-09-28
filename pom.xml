@@ -64,6 +64,11 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
         </dependency>
+        <!-- 调用 rerank 接口 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-restclient</artifactId>
+        </dependency>
         <!-- 简历 PDF 解析 -->
         <dependency>
             <groupId>org.apache.pdfbox</groupId>

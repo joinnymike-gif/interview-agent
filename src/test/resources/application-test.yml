@@ -8,3 +8,9 @@ spring:
   autoconfigure:
     # 不连数据库
     exclude: org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
+
+interview:
+  rag:
+    rerank:
+      # 测试里不调用 rerank 接口
+      enabled: false

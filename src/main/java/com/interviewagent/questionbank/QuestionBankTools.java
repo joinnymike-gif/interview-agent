@@ -24,9 +24,9 @@ public class QuestionBankTools {
         this.retriever = retriever;
     }
 
-    @Tool(description = "从题库中按语义检索候选面试题，返回题目和考察要点，按相关度从高到低排列")
+    @Tool(description = "从题库中检索候选面试题（语义和关键词混合检索），返回题目和考察要点，按相关度从高到低排列")
     public List<Question> searchQuestions(
-            @ToolParam(description = "想考察的内容，用自然语言描述，可以结合候选人简历里的项目和技术栈，例如：订单系统的分布式事务、JVM 垃圾回收调优")
+            @ToolParam(description = "想考察的内容，可以用自然语言描述，也可以是具体的技术名词，尽量结合候选人简历里的项目和技术栈，例如：订单系统的分布式事务、JVM 垃圾回收调优、MVCC")
             String query,
             @ToolParam(description = "难度：EASY、MEDIUM 或 HARD；不填表示不限难度", required = false)
             Difficulty difficulty) {

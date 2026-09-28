@@ -1,6 +1,8 @@
 package com.interviewagent.config;
 
 import com.interviewagent.questionbank.QuestionBankTools;
+import com.interviewagent.rag.HttpReranker;
+import com.interviewagent.rag.Reranker;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
@@ -12,12 +14,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
+import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClient;
 
 /**
  * 大模型相关的 Bean。
  * <p>
- * 这里只依赖 Spring AI 的通用抽象（ChatClient / ChatMemory / BatchingStrategy），不依赖具体厂商，
- * 所以切换 DeepSeek、通义千问、Claude 等模型只需要改配置，不用改代码。
+ * 这里只依赖通用抽象（Spring AI 的 ChatClient / ChatMemory / BatchingStrategy，以及自定义的 Reranker），
+ * 不依赖具体厂商，所以切换 DeepSeek、通义千问、Claude 等模型只需要改配置，不用改代码。
  */
 @Configuration
 public class AiConfig {
@@ -41,6 +45,22 @@ public class AiConfig {
     @Bean
     BatchingStrategy embeddingBatchingStrategy(InterviewProperties properties) {
         return new MaxSizeBatchingStrategy(properties.rag().embeddingBatchSize());
+    }
+
+    /**
+     * 检索结果的重排序。关闭时不调用接口，直接使用混合检索的排序。
+     */
+    @Bean
+    Reranker reranker(InterviewProperties properties, RestClient.Builder restClientBuilder) {
+        InterviewProperties.Rerank rerank = properties.rag().rerank();
+        if (!rerank.enabled()) {
+            return Reranker.NONE;
+        }
+        if (!StringUtils.hasText(rerank.apiKey())) {
+            throw new IllegalStateException(
+                    "已开启 rerank，但没有配置 RERANK_API_KEY（默认复用 EMBEDDING_API_KEY）。不需要 rerank 可以设置 RERANK_ENABLED=false");
+        }
+        return new HttpReranker(restClientBuilder, rerank.url(), rerank.apiKey(), rerank.model(), rerank.timeout());
     }
 
     /**

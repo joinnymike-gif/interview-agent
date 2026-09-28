@@ -70,12 +70,24 @@ interview:
   # 对话记忆保留的最近消息条数
   memory-max-messages: 200
   rag:
-    # 每次检索返回的题目数量
+    # 最终返回给模型的题目数量
     top-k: 5
+    # 向量检索、关键词检索各召回多少条候选；融合后最多这么多条交给 rerank
+    candidates: 20
     # 每次调用 embedding 接口最多提交的文本条数，通义千问 text-embedding-v4 限制为 10
     embedding-batch-size: 10
+    rerank:
+      enabled: ${RERANK_ENABLED:true}
+      # 默认用百炼的 qwen3-rerank，Key 默认复用 EMBEDDING_API_KEY
+      url: ${RERANK_URL:https://dashscope.aliyuncs.com/compatible-api/v1/reranks}
+      api-key: ${RERANK_API_KEY:${EMBEDDING_API_KEY:}}
+      model: ${RERANK_MODEL:qwen3-rerank}
+      # 超时后放弃重排序，直接用混合检索的结果
+      timeout: 5s
 
 logging:
   level:
     # 改成 DEBUG 可以看到每次发给模型的完整请求和响应（SimpleLoggerAdvisor）
     org.springframework.ai.chat.client.advisor: INFO
+    # 改成 DEBUG 可以看到每次检索各步骤的结果（向量召回、关键词召回、融合、rerank）
+    com.interviewagent.questionbank.QuestionRetriever: INFO
